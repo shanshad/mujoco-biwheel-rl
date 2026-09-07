@@ -6,9 +6,15 @@ MOTOR_SPEED_STEP = 0.2
 MOTOR_SPEED_LIMIT = 5.0
 PRINT_EVERY = 50
 
-# Match these to the 'name' attribute in your XML <actuator> tags
 LEFT_MOTOR = "left_motor"
 RIGHT_MOTOR = "right_motor"
+IMU_ACCEL="imu_accel"
+IMU_GYRO="imu_gyro"
+LEFT_WHEEL_POS="left_wheel_pos"
+RIGHT_WHEEL_POS="right_wheel_pos"
+LEFT_WHEEL_VEL="left_wheel_vel"
+RIGHT_WHEEL_VEL="right_wheel_vel"
+
 
 KEY_BACKSPACE = 259
 KEY_UP = 265
@@ -67,11 +73,11 @@ with mujoco.viewer.launch_passive(model, data, key_callback=key_callback) as vie
         # 3. Read your sensor values while it simulates
         steps += 1
         if steps % PRINT_EVERY == 0:
-            accel = data.sensor("imu_accel").data
-            gyro = data.sensor("imu_gyro").data
+            accel = data.sensor(IMU_ACCEL).data
+            gyro = data.sensor(IMU_GYRO).data
             # Fixed names here to match XML "left_wheel_pos" / "right_wheel_pos"
-            left_pos = data.sensor("left_wheel_pos").data
-            right_pos = data.sensor("right_wheel_pos").data
+            left_pos = data.sensor(LEFT_WHEEL_POS).data
+            right_pos = data.sensor(RIGHT_WHEEL_POS).data
 
             print(f"Accel: {accel}")
             print(f"Gyro: {gyro}")
