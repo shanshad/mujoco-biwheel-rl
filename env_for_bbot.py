@@ -19,6 +19,8 @@ class BalanceBotEnv(gym.Env):
             sensor_right_wheel_vel="right_wheel_vel",
             actuator_left_motor="left_motor",
             actuator_right_motor="right_motor",
+            sensor_left_wheel_pos="left_wheel_pos",
+            sensor_right_wheel_pos="right_wheel_pos",
             alive_bonus=1.0,
             pitch_penalty=5.0,
             action_penalty_coef=0.01,
@@ -39,10 +41,13 @@ class BalanceBotEnv(gym.Env):
         self.base_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "base")
 
         #Define observation space (ie what the agent can see) and limits
-        #[pitch,pitch_rate,wheel_vel_left,wheel_vel_right]
-        obs_low=np.array([-np.pi,-20,-50,-50],dtype=np.float32)
-        obs_high=np.array([np.pi,20.0,50.0,50.0],dtype=np.float32)
+        # [pitch, pitch_rate, wheel_vel_left, wheel_vel_right, avg_wheel_pos_delta]
+        obs_low=np.array([-np.pi,-20,-50,-50,-1e4],dtype=np.float32)
+        obs_high=np.array([np.pi,20.0,50.0,50.0,1e4],dtype=np.float32)
         self.observation_space=spaces.Box(obs_low,obs_high,dtype=np.float32)
+
+        self.sensor_left_wheel_pos=sensor_left_wheel_pos
+        self.sensor_right_wheel_pos=sensor_right_wheel_pos
 
         #define action space (i.e what the agent can do) and limits, normalized to [-1,1]
         #[left_wheel_torque,right_wheel_torque]
@@ -73,7 +78,12 @@ class BalanceBotEnv(gym.Env):
 
         wheel_vel_left=self.data.sensor(self.sensor_left_wheel_vel).data[0]
         wheel_vel_right=self.data.sensor(self.sensor_right_wheel_vel).data[0]
-        return np.array([self._pitch,pitch_rate,wheel_vel_left,wheel_vel_right],dtype=np.float32)
+
+        left_pos=self.data.sensor(self.sensor_left_wheel_pos).data[0]
+        right_pos=self.data.sensor(self.sensor_right_wheel_pos).data[0]
+        avg_wheel_pos_delta = 0.5*(left_pos+right_pos) - self._wheel_pos_ref
+
+        return np.array([self._pitch,pitch_rate,wheel_vel_left,wheel_vel_right,avg_wheel_pos_delta],dtype=np.float32)
 
     def reset(self,seed=None,options=None):
         super().reset(seed=seed)
@@ -83,6 +93,9 @@ class BalanceBotEnv(gym.Env):
         #qvel[4]=wy (rad/s)
         self.data.qvel[4]+=self.np_random.uniform(-0.5,0.5)
         mujoco.mj_forward(self.model,self.data)
+        left_pos0 = self.data.sensor(self.sensor_left_wheel_pos).data[0]
+        right_pos0 = self.data.sensor(self.sensor_right_wheel_pos).data[0]
+        self._wheel_pos_ref = 0.5 * (left_pos0 + right_pos0)
         self._step=0
         return self._get_obs(),{}
 
@@ -118,7 +131,7 @@ class BalanceBotEnv(gym.Env):
         y_pos = self.data.xpos[self.base_body_id][1]
         distance_from_center = math.sqrt(x_pos**2 + y_pos**2)
         position_penalty = self.position_penalty_coef * distance_from_center
-        wheel_speed_penalty = 0.05 * (wheel_vel_left**2 + wheel_vel_right**2)
+        wheel_speed_penalty = 0.005 * (wheel_vel_left**2 + wheel_vel_right**2)
         #yaw_rate=self.data.qvel[5]
         yaw_rate = self.data.sensor(self.sensor_imu_gyro).data[2]
         yaw_penalty=self.yaw_penalty_coef*abs(yaw_rate)
